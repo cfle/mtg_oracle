@@ -1,0 +1,8 @@
+*.npy filter=lfs diff=lfs merge=lfs -text
+*.index filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/cards.json filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/faiss_trimmed.index filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/embeddings_trimmed.npy filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/*.json filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/*.npy filter=lfs diff=lfs merge=lfs -text
+MTGCacheAllCards/*.index filter=lfs diff=lfs merge=lfs -text
