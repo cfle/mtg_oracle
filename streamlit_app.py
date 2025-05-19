@@ -5,6 +5,9 @@ import faiss
 import numpy as np
 import streamlit as st
 
+# Run the setup script to pull Git LFS files
+os.system("bash setup.sh")
+
 client = None  # Disabled for deployment
 
 CACHE_DIR = "MTGCacheAllCards"
