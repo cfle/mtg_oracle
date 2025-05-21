@@ -9,27 +9,27 @@ CACHE_DIR = "MTGCacheAllCards"
 EMBED_MODEL = "text-embedding-ada-002"
 SIMILARITY_THRESHOLD = 0.4
 
+# GitHub Release with cache files
 GITHUB_RELEASE = "https://github.com/cfle/mtg_oracle/releases/download/v1.0"
-
 REQUIRED_FILES = {
     "cards.json": f"{GITHUB_RELEASE}/cards.json",
     "embeddings_trimmed.npy": f"{GITHUB_RELEASE}/embeddings_trimmed.npy",
     "faiss_trimmed.index": f"{GITHUB_RELEASE}/faiss_trimmed.index",
 }
 
-
 def download_file(filename, url):
-    """Download a file if it does not exist in the cache directory."""
     local_path = os.path.join(CACHE_DIR, filename)
     if not os.path.exists(local_path):
-        st.write(f"⬇️ Downloading {filename}...")
+        st.info(f"📦 Downloading `{filename}`...")
         os.makedirs(CACHE_DIR, exist_ok=True)
-        with requests.get(url, stream=True) as r:
-            r.raise_for_status()
-            with open(local_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
+        try:
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                with open(local_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+        except Exception as e:
+            raise RuntimeError(f"Failed to download {filename}: {e}")
 
 def validate_cache_files():
     missing = []
@@ -40,25 +40,22 @@ def validate_cache_files():
                 download_file(filename, url)
             except Exception as e:
                 missing.append((filename, str(e)))
-
     if missing:
         st.error("🛑 Failed to download required files:")
         for fname, err in missing:
-            st.write(f"- {fname}: {err}")
+            st.code(f"{fname}: {err}")
         st.stop()
-
 
 def fetch_cards():
     with open(os.path.join(CACHE_DIR, "cards.json"), "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def get_card_text(card):
-    parts = []
-    parts.append(card.get("oracle_text", ""))
-    parts.append(" ".join(card.get("keywords", [])))
+    parts = [
+        card.get("oracle_text", ""),
+        " ".join(card.get("keywords", []))
+    ]
     return " ".join(parts).strip()
-
 
 @st.cache_data
 def load_data():
@@ -66,7 +63,6 @@ def load_data():
     embeddings = np.load(os.path.join(CACHE_DIR, "embeddings_trimmed.npy"))
     index = faiss.read_index(os.path.join(CACHE_DIR, "faiss_trimmed.index"))
     return cards, embeddings, index
-
 
 def try_get_card_text_from_name(name):
     try:
@@ -78,7 +74,6 @@ def try_get_card_text_from_name(name):
     except:
         return None, None
     return None, None
-
 
 def main():
     resolved_card = None
@@ -158,7 +153,6 @@ def main():
                             st.image(image_url, use_container_width=True)
                         st.markdown(f"[**{card.get('name', 'Unknown Card')}**]({card.get('scryfall_uri', '#')})")
                         st.markdown(f"**Similarity:** `{score:.3f}`")
-
 
 if __name__ == "__main__":
     main()
