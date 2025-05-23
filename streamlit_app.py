@@ -3,13 +3,13 @@ import json
 import requests
 import faiss
 import numpy as np
+import re
 import streamlit as st
 
 CACHE_DIR = "MTGCacheAllCards"
 EMBED_MODEL = "text-embedding-ada-002"
 SIMILARITY_THRESHOLD = 0.4
 
-# GitHub Release with cache files
 GITHUB_RELEASE = "https://github.com/cfle/mtg_oracle/releases/download/v1.0"
 REQUIRED_FILES = {
     "cards.json": f"{GITHUB_RELEASE}/cards.json",
@@ -22,14 +22,11 @@ def download_file(filename, url):
     if not os.path.exists(local_path):
         st.info(f"📦 Downloading `{filename}`...")
         os.makedirs(CACHE_DIR, exist_ok=True)
-        try:
-            with requests.get(url, stream=True) as r:
-                r.raise_for_status()
-                with open(local_path, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-        except Exception as e:
-            raise RuntimeError(f"Failed to download {filename}: {e}")
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(local_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
 def validate_cache_files():
     missing = []
@@ -51,11 +48,12 @@ def fetch_cards():
         return json.load(f)
 
 def get_card_text(card):
-    parts = [
-        card.get("oracle_text", ""),
-        " ".join(card.get("keywords", []))
-    ]
-    return " ".join(parts).strip()
+    name = card.get("name", "")
+    text = card.get("oracle_text", "")
+    if name:
+        text = re.sub(rf'\b{re.escape(name)}\b', "this card", text, flags=re.IGNORECASE)
+    keywords = " ".join(card.get("keywords", []))
+    return f"{text} {keywords}".strip()
 
 @st.cache_data
 def load_data():
@@ -105,7 +103,11 @@ def main():
     if query and search_button:
         with st.spinner("🔍 Searching..."):
             resolved_text, resolved_card = try_get_card_text_from_name(query)
-            query_text = get_card_text(resolved_card) if resolved_card else query
+            if not resolved_card:
+                st.error("❌ Could not resolve that card name via Scryfall.")
+                return
+
+            query_text = get_card_text(resolved_card)
 
             try:
                 ref_index = next(i for i, c in enumerate(cards) if c["id"] == resolved_card["id"])
@@ -122,12 +124,14 @@ def main():
                 if score >= SIMILARITY_THRESHOLD and cards[idx].get("id") != resolved_card.get("id")
             ]
 
+            # Permissive color match (not strict identity)
             if selected_colors:
                 def matches_color(card):
                     identity = card.get("color_identity", [])
                     if "C" in selected_colors:
                         return (not identity and "C" in selected_colors) or any(c in identity for c in selected_colors if c != "C")
                     return any(c in identity for c in selected_colors)
+
                 results = [(score, card) for score, card in results if matches_color(card)]
 
             if not results:
